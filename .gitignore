@@ -1,4 +1,35 @@
+# Environment files
 .env
-*.json
+.env.local
+.env.production
+
+# Firebase credentials
+firebase-service-account-key.json
+*-service-account*.json
+*.pem
+
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Seed scripts with sensitive data
+seed_users.py

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Outgoing Messages - SMS Dashboard{% endblock %}
+
+{% block body %}
+<div class="header">
+    <h1>SMS Messaging Dashboard</h1>
+    <div class="nav">
+        <a href="/">Dashboard</a>
+        <a href="/incoming">Incoming Messages</a>
+        <a href="/outgoing" class="active">Outgoing Messages</a>
+        <a href="/send">Send Message</a>
+        <a href="/users">Users</a>
+    </div>
+    <a href="/logout" class="logout btn btn-secondary">Logout</a>
+</div>
+<div class="container">
+    <div class="card">
+        <h2>Outgoing Messages</h2>
+        <div class="search-box">
+            <input type="text" id="search" placeholder="Search by phone number...">
+            <select id="filter">
+                <option value="">All</option>
+                <option value="sent">Sent</option>
+                <option value="failed">Failed</option>
+                <option value="queued">Queued</option>
+            </select>
+            <button class="btn" onclick="loadMessages()">Search</button>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Sent At</th>
+                    <th>Phone Number</th>
+                    <th>Message Content</th>
+                    <th>Operator</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="messages-body">
+                <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+<script>
+    async function loadMessages() {
+        const search = document.getElementById('search').value;
+        const filter = document.getElementById('filter').value;
+
+        let url = '/api/messages/outgoing?limit=100';
+        if (search) url += '&phoneNumber=' + encodeURIComponent(search);
+        if (filter) url += '&status=' + filter;
+
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+
+            const tbody = document.getElementById('messages-body');
+            if (data.messages.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No messages found</td></tr>';
+            } else {
+                tbody.innerHTML = data.messages.map(m => `
+                    <tr>
+                        <td class="timestamp">${m.sentAt ? new Date(m.sentAt).toLocaleString() : new Date(m.queuedAt).toLocaleString()}</td>
+                        <td class="phone">${m.phoneNumber}</td>
+                        <td class="message-content" title="${m.messageContent}">${m.messageContent}</td>
+                        <td>${m.operatorName || m.operatorId}</td>
+                        <td><span class="badge ${m.status === 'sent' ? 'badge-success' : m.status === 'failed' ? 'badge-error' : 'badge-warning'}">${m.status}</span></td>
+                    </tr>
+                `).join('');
+            }
+        } catch (e) {
+            console.error('Failed to load messages:', e);
+        }
+    }
+    loadMessages();
+</script>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Incoming Messages - SMS Dashboard{% endblock %}
+
+{% block body %}
+<div class="header">
+    <h1>SMS Messaging Dashboard</h1>
+    <div class="nav">
+        <a href="/">Dashboard</a>
+        <a href="/incoming" class="active">Incoming Messages</a>
+        <a href="/outgoing">Outgoing Messages</a>
+        <a href="/send">Send Message</a>
+        <a href="/users">Users</a>
+    </div>
+    <a href="/logout" class="logout btn btn-secondary">Logout</a>
+</div>
+<div class="container">
+    <div class="card">
+        <h2>Incoming Messages</h2>
+        <div class="search-box">
+            <input type="text" id="search" placeholder="Search by phone number...">
+            <select id="filter">
+                <option value="">All</option>
+                <option value="true">Registered Only</option>
+                <option value="false">Unknown Only</option>
+            </select>
+            <button class="btn" onclick="loadMessages()">Search</button>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Phone Number</th>
+                    <th>Message Content</th>
+                    <th>Status</th>
+                    <th>Response Sent</th>
+                </tr>
+            </thead>
+            <tbody id="messages-body">
+                <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+<script>
+    async function loadMessages() {
+        const search = document.getElementById('search').value;
+        const filter = document.getElementById('filter').value;
+
+        let url = '/api/messages/incoming?limit=100';
+        if (search) url += '&phoneNumber=' + encodeURIComponent(search);
+        if (filter) url += '&isRegistered=' + filter;
+
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+
+            const tbody = document.getElementById('messages-body');
+            if (data.messages.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No messages found</td></tr>';
+            } else {
+                tbody.innerHTML = data.messages.map(m => `
+                    <tr>
+                        <td class="timestamp">${new Date(m.timestamp).toLocaleString()}</td>
+                        <td class="phone">${m.phoneNumber}</td>
+                        <td class="message-content" title="${m.messageContent}">${m.messageContent || '(empty)'}</td>
+                        <td>${m.isRegistered
+                            ? '<span class="badge badge-success">Registered</span>'
+                            : '<span class="badge badge-warning">Unknown</span>'}</td>
+                        <td>${m.responseSent
+                            ? '<span class="badge badge-success">Yes</span>'
+                            : '<span class="badge badge-info">No</span>'}</td>
+                    </tr>
+                `).join('');
+            }
+        } catch (e) {
+            console.error('Failed to load messages:', e);
+        }
+    }
+    loadMessages();
+</script>
+{% endblock %}

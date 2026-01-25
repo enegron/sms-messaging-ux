@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Users - SMS Dashboard{% endblock %}
+
+{% block body %}
+<div class="header">
+    <h1>SMS Messaging Dashboard</h1>
+    <div class="nav">
+        <a href="/">Dashboard</a>
+        <a href="/incoming">Incoming Messages</a>
+        <a href="/outgoing">Outgoing Messages</a>
+        <a href="/send">Send Message</a>
+        <a href="/users" class="active">Users</a>
+    </div>
+    <a href="/logout" class="logout btn btn-secondary">Logout</a>
+</div>
+<div class="container">
+    <div class="card">
+        <h2>Registered Users</h2>
+        <div class="search-box">
+            <select id="filter">
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="all">All</option>
+            </select>
+            <button class="btn" onclick="loadUsers()">Filter</button>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Phone Number</th>
+                    <th>Name</th>
+                    <th>Status</th>
+                    <th>Created At</th>
+                </tr>
+            </thead>
+            <tbody id="users-body">
+                <tr><td colspan="4" class="empty-state">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+<script>
+    async function loadUsers() {
+        const filter = document.getElementById('filter').value;
+
+        try {
+            const res = await fetch('/api/users?status=' + filter);
+            const data = await res.json();
+
+            const tbody = document.getElementById('users-body');
+            if (data.users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No users found</td></tr>';
+            } else {
+                tbody.innerHTML = data.users.map(u => `
+                    <tr>
+                        <td class="phone">${u.phoneNumber}</td>
+                        <td>${u.name || '-'}</td>
+                        <td><span class="badge ${u.status === 'active' ? 'badge-success' : 'badge-warning'}">${u.status}</span></td>
+                        <td class="timestamp">${u.createdAt ? new Date(u.createdAt).toLocaleString() : '-'}</td>
+                    </tr>
+                `).join('');
+            }
+        } catch (e) {
+            console.error('Failed to load users:', e);
+        }
+    }
+    loadUsers();
+</script>
+{% endblock %}

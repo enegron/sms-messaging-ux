@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}SMS Dashboard - Login{% endblock %}
+
+{% block body %}
+<style>
+    .login-container { max-width: 400px; margin: 100px auto; }
+    .login-card { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .login-card h1 { text-align: center; margin-bottom: 30px; color: #2563eb; }
+</style>
+
+<div class="login-container">
+    <div class="login-card">
+        <h1>SMS Dashboard</h1>
+        {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+        <form method="POST">
+            <div class="form-group">
+                <label for="password">Operator Password</label>
+                <input type="password" id="password" name="password" required autofocus>
+            </div>
+            <button type="submit" class="btn" style="width: 100%;">Login</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

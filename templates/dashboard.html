@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}SMS Dashboard{% endblock %}
+
+{% block body %}
+<div class="header">
+    <h1>SMS Messaging Dashboard</h1>
+    <div class="nav">
+        <a href="/" class="active">Dashboard</a>
+        <a href="/incoming">Incoming Messages</a>
+        <a href="/outgoing">Outgoing Messages</a>
+        <a href="/send">Send Message</a>
+        <a href="/users">Users</a>
+    </div>
+    <a href="/logout" class="logout btn btn-secondary">Logout</a>
+</div>
+<div class="container">
+    <div class="card">
+        <h2>Quick Stats</h2>
+        <div id="stats" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-top: 15px;">
+            <div style="text-align: center; padding: 20px; background: #f0f9ff; border-radius: 8px;">
+                <div style="font-size: 32px; font-weight: bold; color: #2563eb;" id="total-users">-</div>
+                <div style="color: #6b7280;">Active Users</div>
+            </div>
+            <div style="text-align: center; padding: 20px; background: #f0fdf4; border-radius: 8px;">
+                <div style="font-size: 32px; font-weight: bold; color: #16a34a;" id="incoming-count">-</div>
+                <div style="color: #6b7280;">Incoming Messages</div>
+            </div>
+            <div style="text-align: center; padding: 20px; background: #fefce8; border-radius: 8px;">
+                <div style="font-size: 32px; font-weight: bold; color: #ca8a04;" id="outgoing-count">-</div>
+                <div style="color: #6b7280;">Outgoing Messages</div>
+            </div>
+            <div style="text-align: center; padding: 20px; background: #fdf2f8; border-radius: 8px;">
+                <div style="font-size: 32px; font-weight: bold; color: #db2777;" id="unknown-count">-</div>
+                <div style="color: #6b7280;">Unknown Numbers</div>
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <h2>Recent Activity</h2>
+        <table id="recent-table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Type</th>
+                    <th>Phone Number</th>
+                    <th>Message</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="recent-body">
+                <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+<script>
+    async function loadStats() {
+        try {
+            const [users, incoming, outgoing] = await Promise.all([
+                fetch('/api/users').then(r => r.json()),
+                fetch('/api/messages/incoming?limit=1000').then(r => r.json()),
+                fetch('/api/messages/outgoing?limit=1000').then(r => r.json())
+            ]);
+
+            document.getElementById('total-users').textContent = users.count || 0;
+            document.getElementById('incoming-count').textContent = incoming.count || 0;
+            document.getElementById('outgoing-count').textContent = outgoing.count || 0;
+            document.getElementById('unknown-count').textContent =
+                (incoming.messages || []).filter(m => !m.isRegistered).length;
+
+            // Combine and sort recent messages
+            const all = [
+                ...(incoming.messages || []).map(m => ({...m, type: 'incoming'})),
+                ...(outgoing.messages || []).map(m => ({...m, type: 'outgoing', timestamp: m.queuedAt}))
+            ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 10);
+
+            const tbody = document.getElementById('recent-body');
+            if (all.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No messages yet</td></tr>';
+            } else {
+                tbody.innerHTML = all.map(m => `
+                    <tr>
+                        <td class="timestamp">${new Date(m.timestamp).toLocaleString()}</td>
+                        <td><span class="badge ${m.type === 'incoming' ? 'badge-info' : 'badge-success'}">${m.type}</span></td>
+                        <td class="phone">${m.phoneNumber}</td>
+                        <td class="message-content">${m.messageContent || '(empty)'}</td>
+                        <td>${m.type === 'incoming'
+                            ? (m.isRegistered ? '<span class="badge badge-success">Registered</span>' : '<span class="badge badge-warning">Unknown</span>')
+                            : `<span class="badge ${m.status === 'sent' ? 'badge-success' : 'badge-error'}">${m.status}</span>`
+                        }</td>
+                    </tr>
+                `).join('');
+            }
+        } catch (e) {
+            console.error('Failed to load stats:', e);
+        }
+    }
+    loadStats();
+</script>
+{% endblock %}

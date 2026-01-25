@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Send Message - SMS Dashboard{% endblock %}
+
+{% block body %}
+<div class="header">
+    <h1>SMS Messaging Dashboard</h1>
+    <div class="nav">
+        <a href="/">Dashboard</a>
+        <a href="/incoming">Incoming Messages</a>
+        <a href="/outgoing">Outgoing Messages</a>
+        <a href="/send" class="active">Send Message</a>
+        <a href="/users">Users</a>
+    </div>
+    <a href="/logout" class="logout btn btn-secondary">Logout</a>
+</div>
+<div class="container">
+    <div class="card" style="max-width: 600px;">
+        <h2>Send New Message</h2>
+        <div id="alert"></div>
+        <form id="send-form">
+            <div class="form-group">
+                <label for="phone">Recipient</label>
+                <select id="phone" name="phone" required>
+                    <option value="">Loading users...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="message">Message</label>
+                <textarea id="message" name="message" placeholder="Enter your message..." required></textarea>
+                <div style="text-align: right; font-size: 12px; color: #6b7280; margin-top: 5px;">
+                    <span id="char-count">0</span> / 1600 characters
+                </div>
+            </div>
+            <button type="submit" class="btn">Send Message</button>
+        </form>
+    </div>
+</div>
+<script>
+    // Load users for dropdown
+    async function loadUsers() {
+        try {
+            const res = await fetch('/api/users?status=active');
+            const data = await res.json();
+
+            const select = document.getElementById('phone');
+            if (data.users.length === 0) {
+                select.innerHTML = '<option value="">No active users found</option>';
+            } else {
+                select.innerHTML = '<option value="">Select a user...</option>' +
+                    data.users.map(u => `<option value="${u.phoneNumber}">${u.name || u.phoneNumber} (${u.phoneNumber})</option>`).join('');
+            }
+        } catch (e) {
+            console.error('Failed to load users:', e);
+        }
+    }
+    loadUsers();
+
+    // Character counter
+    document.getElementById('message').addEventListener('input', function() {
+        document.getElementById('char-count').textContent = this.value.length;
+    });
+
+    // Send form
+    document.getElementById('send-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const phone = document.getElementById('phone').value;
+        const message = document.getElementById('message').value;
+        const alert = document.getElementById('alert');
+
+        if (!phone) {
+            alert.innerHTML = '<div class="alert alert-error">Please select a recipient</div>';
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/send-message', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    phoneNumber: phone,
+                    messageContent: message
+                })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                alert.innerHTML = '<div class="alert alert-success">Message sent successfully!</div>';
+                document.getElementById('message').value = '';
+                document.getElementById('char-count').textContent = '0';
+            } else {
+                alert.innerHTML = `<div class="alert alert-error">${data.message || 'Failed to send message'}</div>`;
+            }
+        } catch (e) {
+            alert.innerHTML = '<div class="alert alert-error">Failed to send message</div>';
+            console.error('Failed to send:', e);
+        }
+    });
+</script>
+{% endblock %}
