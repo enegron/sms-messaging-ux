@@ -95,3 +95,10 @@ def send_message():
 def users():
     """Users list view."""
     return render_template('users.html')
+
+
+@dashboard_bp.route('/simulate')
+@login_required
+def simulate():
+    """Simulate incoming SMS page (simulation mode only)."""
+    return render_template('simulate.html')

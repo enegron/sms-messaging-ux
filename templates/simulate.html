@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Simulate Incoming - SMS Dashboard{% endblock %}
+
+{% block body %}
+<div class="header">
+    <h1>SMS Messaging Dashboard</h1>
+    <div class="nav">
+        <a href="/">Dashboard</a>
+        <a href="/incoming">Incoming Messages</a>
+        <a href="/outgoing">Outgoing Messages</a>
+        <a href="/send">Send Message</a>
+        <a href="/users">Users</a>
+        <a href="/simulate" class="simulation-only active" style="display:none;">Simulate Incoming</a>
+    </div>
+    <a href="/logout" class="logout btn btn-secondary">Logout</a>
+</div>
+<div class="container">
+    <div class="card" style="max-width: 600px;">
+        <h2>Simulate Incoming SMS</h2>
+        <p style="color: #6b7280; margin-bottom: 20px;">
+            Simulate receiving an SMS from a phone number. This tests the incoming message flow,
+            including user recognition and automatic acknowledgment responses.
+        </p>
+        <div id="alert"></div>
+        <form id="simulate-form">
+            <div class="form-group">
+                <label for="sender-type">Sender Type</label>
+                <select id="sender-type" name="sender-type" onchange="updatePhoneInput()">
+                    <option value="registered">Registered User</option>
+                    <option value="unknown">Unknown Number</option>
+                </select>
+            </div>
+            <div class="form-group" id="registered-user-group">
+                <label for="registered-phone">Select Registered User</label>
+                <select id="registered-phone" name="registered-phone">
+                    <option value="">Loading users...</option>
+                </select>
+            </div>
+            <div class="form-group" id="unknown-phone-group" style="display:none;">
+                <label for="unknown-phone">Enter Phone Number</label>
+                <input type="text" id="unknown-phone" name="unknown-phone" placeholder="+1234567890">
+                <div style="font-size: 12px; color: #6b7280; margin-top: 5px;">
+                    Must be in E.164 format (e.g., +12025551234)
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="message">Message Content</label>
+                <textarea id="message" name="message" placeholder="Enter the simulated incoming message..." required></textarea>
+            </div>
+            <button type="submit" class="btn">Simulate Incoming SMS</button>
+        </form>
+    </div>
+
+    <div class="card" style="max-width: 600px;">
+        <h2>What Happens</h2>
+        <table>
+            <tr>
+                <td><strong>Registered User</strong></td>
+                <td>
+                    Message is logged with <span class="badge badge-success">Registered</span> status.
+                    An automatic acknowledgment response is generated and logged.
+                </td>
+            </tr>
+            <tr>
+                <td><strong>Unknown Number</strong></td>
+                <td>
+                    Message is logged with <span class="badge badge-warning">Unknown</span> status.
+                    No response is sent (as per system design).
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>
+<script>
+    // Load users for dropdown
+    async function loadUsers() {
+        try {
+            const res = await fetch('/api/users?status=active');
+            const data = await res.json();
+
+            const select = document.getElementById('registered-phone');
+            if (data.users.length === 0) {
+                select.innerHTML = '<option value="">No active users found</option>';
+            } else {
+                select.innerHTML = data.users.map(u =>
+                    `<option value="${u.phoneNumber}">${u.name || u.phoneNumber} (${u.phoneNumber})</option>`
+                ).join('');
+            }
+        } catch (e) {
+            console.error('Failed to load users:', e);
+        }
+    }
+    loadUsers();
+
+    // Toggle phone input based on sender type
+    function updatePhoneInput() {
+        const senderType = document.getElementById('sender-type').value;
+        const registeredGroup = document.getElementById('registered-user-group');
+        const unknownGroup = document.getElementById('unknown-phone-group');
+
+        if (senderType === 'registered') {
+            registeredGroup.style.display = 'block';
+            unknownGroup.style.display = 'none';
+        } else {
+            registeredGroup.style.display = 'none';
+            unknownGroup.style.display = 'block';
+        }
+    }
+
+    // Submit form
+    document.getElementById('simulate-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const senderType = document.getElementById('sender-type').value;
+        const message = document.getElementById('message').value;
+        const alertDiv = document.getElementById('alert');
+
+        let phoneNumber;
+        if (senderType === 'registered') {
+            phoneNumber = document.getElementById('registered-phone').value;
+        } else {
+            phoneNumber = document.getElementById('unknown-phone').value;
+        }
+
+        if (!phoneNumber) {
+            alertDiv.innerHTML = '<div class="alert alert-error">Please select or enter a phone number</div>';
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/simulate/incoming', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    phoneNumber: phoneNumber,
+                    messageContent: message
+                })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                const statusBadge = data.isRegistered
+                    ? '<span class="badge badge-success">Registered</span>'
+                    : '<span class="badge badge-warning">Unknown</span>';
+                const responseNote = data.responseSent
+                    ? 'Acknowledgment response was logged.'
+                    : 'No response sent (unknown number).';
+
+                alertDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        Incoming SMS simulated! ${statusBadge}<br>
+                        <small>${responseNote}</small>
+                    </div>
+                `;
+                document.getElementById('message').value = '';
+            } else {
+                alertDiv.innerHTML = `<div class="alert alert-error">${data.message || 'Failed to simulate incoming message'}</div>`;
+            }
+        } catch (e) {
+            alertDiv.innerHTML = '<div class="alert alert-error">Failed to simulate incoming message</div>';
+            console.error('Failed to simulate:', e);
+        }
+    });
+</script>
+{% endblock %}

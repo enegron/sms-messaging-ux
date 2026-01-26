@@ -8,7 +8,7 @@ from flask import Blueprint, request, jsonify, session
 from firebase_admin import firestore
 
 from services.firebase import get_db
-from services.twilio_sms import send_sms
+from services.twilio_sms import send_sms, is_simulation_mode, SimulatedFailure
 from routes.auth import login_required
 
 logger = logging.getLogger(__name__)
@@ -22,13 +22,25 @@ def is_valid_e164(phone_number):
     return bool(re.match(pattern, phone_number))
 
 
+@api_bp.route('/config', methods=['GET'])
+@login_required
+def get_config():
+    """
+    Get current configuration.
+    GET /api/config
+    """
+    return jsonify({
+        'simulationMode': is_simulation_mode()
+    }), 200
+
+
 @api_bp.route('/send-message', methods=['POST'])
 @login_required
 def send_message():
     """
     Send an SMS to a registered user.
     POST /api/send-message
-    Body: {"phoneNumber": "+1...", "messageContent": "...", "operatorId": "..."}
+    Body: {"phoneNumber": "+1...", "messageContent": "...", "operatorId": "...", "simulateStatus": "sent"}
     """
     try:
         data = request.get_json()
@@ -40,6 +52,7 @@ def send_message():
         message_content = data.get('messageContent', '')
         operator_id = data.get('operatorId', session.get('operator_id', 'unknown'))
         operator_name = session.get('operator_name', 'Unknown Operator')
+        simulate_status = data.get('simulateStatus', 'sent')  # For simulation mode: 'sent', 'failed', 'queued'
 
         # Validate phone number format
         if not is_valid_e164(phone_number):
@@ -56,6 +69,7 @@ def send_message():
             }), 400
 
         db = get_db()
+        simulated = is_simulation_mode()
 
         # Check if user exists and is active
         user_doc = db.collection('users').document(phone_number).get()
@@ -84,47 +98,51 @@ def send_message():
             'operatorName': operator_name,
             'status': 'queued',
             'twilio_SmsMessageSid': None,
-            'twilio_ErrorMessage': None
+            'twilio_ErrorMessage': None,
+            'simulated': simulated
         }
 
         # Add to Firestore first
         doc_ref = db.collection('outgoingMessages').add(outgoing_message)
         message_id = doc_ref[1].id
 
-        # Send via Twilio
+        # Send via Twilio (or simulate)
         try:
-            twilio_message = send_sms(phone_number, message_content)
+            twilio_message = send_sms(phone_number, message_content, simulate_status=simulate_status)
 
             # Update record with sent status
             sent_at = datetime.now(timezone.utc)
+            final_status = simulate_status if simulated else 'sent'
             db.collection('outgoingMessages').document(message_id).update({
-                'status': 'sent',
+                'status': final_status,
                 'sentAt': sent_at,
                 'twilio_SmsMessageSid': twilio_message.sid
             })
 
-            logger.info(f"POST /api/send-message 200 {operator_id}")
+            logger.info(f"POST /api/send-message 200 {operator_id} simulated={simulated}")
 
             return jsonify({
-                'status': 'sent',
+                'status': final_status,
                 'messageId': message_id,
                 'phoneNumber': phone_number,
                 'timestamp': sent_at.isoformat(),
-                'twilio_MessageSid': twilio_message.sid
+                'twilio_MessageSid': twilio_message.sid,
+                'simulated': simulated
             }), 200
 
-        except Exception as e:
+        except (Exception, SimulatedFailure) as e:
             # Update record with failed status
             db.collection('outgoingMessages').document(message_id).update({
                 'status': 'failed',
                 'twilio_ErrorMessage': str(e)
             })
 
-            logger.error(f"Twilio send failed: {e}")
+            logger.error(f"Send failed: {e} simulated={simulated}")
             return jsonify({
-                'error': 'twilio_error',
+                'error': 'send_error',
                 'message': 'Failed to send SMS',
-                'details': str(e)
+                'details': str(e),
+                'simulated': simulated
             }), 503
 
     except Exception as e:
@@ -141,6 +159,7 @@ def get_incoming_messages():
     """
     Get all incoming messages.
     GET /api/messages/incoming?limit=100&sort=desc&phoneNumber=...&isRegistered=true
+    Auto-filters by simulation mode.
     """
     try:
         limit = request.args.get('limit', 100, type=int)
@@ -149,7 +168,12 @@ def get_incoming_messages():
         registered_filter = request.args.get('isRegistered', '')
 
         db = get_db()
+        simulated = is_simulation_mode()
+
         query = db.collection('incomingMessages')
+
+        # Auto-filter by simulation mode
+        query = query.where('simulated', '==', simulated)
 
         # Apply filters
         if phone_filter:
@@ -179,13 +203,15 @@ def get_incoming_messages():
                 'messageContent': data.get('messageContent', ''),
                 'isRegistered': data.get('isRegistered', False),
                 'responseSent': data.get('responseSent', False),
-                'twilio_SmsMessageSid': data.get('twilio_SmsMessageSid', '')
+                'twilio_SmsMessageSid': data.get('twilio_SmsMessageSid', ''),
+                'simulated': data.get('simulated', False)
             })
 
         return jsonify({
             'status': 'success',
             'count': len(messages),
-            'messages': messages
+            'messages': messages,
+            'simulationMode': simulated
         }), 200
 
     except Exception as e:
@@ -202,6 +228,7 @@ def get_outgoing_messages():
     """
     Get all outgoing messages.
     GET /api/messages/outgoing?limit=100&sort=desc&phoneNumber=...&status=sent&operatorId=...
+    Auto-filters by simulation mode.
     """
     try:
         limit = request.args.get('limit', 100, type=int)
@@ -211,7 +238,12 @@ def get_outgoing_messages():
         operator_filter = request.args.get('operatorId', '')
 
         db = get_db()
+        simulated = is_simulation_mode()
+
         query = db.collection('outgoingMessages')
+
+        # Auto-filter by simulation mode
+        query = query.where('simulated', '==', simulated)
 
         # Apply filters
         if phone_filter:
@@ -246,13 +278,15 @@ def get_outgoing_messages():
                 'operatorName': data.get('operatorName', ''),
                 'status': data.get('status', ''),
                 'twilio_SmsMessageSid': data.get('twilio_SmsMessageSid', ''),
-                'twilio_ErrorMessage': data.get('twilio_ErrorMessage', '')
+                'twilio_ErrorMessage': data.get('twilio_ErrorMessage', ''),
+                'simulated': data.get('simulated', False)
             })
 
         return jsonify({
             'status': 'success',
             'count': len(messages),
-            'messages': messages
+            'messages': messages,
+            'simulationMode': simulated
         }), 200
 
     except Exception as e:
@@ -307,4 +341,100 @@ def get_users():
         return jsonify({
             'error': 'query_failed',
             'message': 'Failed to fetch users from database'
+        }), 500
+
+
+@api_bp.route('/simulate/incoming', methods=['POST'])
+@login_required
+def simulate_incoming():
+    """
+    Simulate an incoming SMS message (only works in simulation mode).
+    POST /api/simulate/incoming
+    Body: {"phoneNumber": "+1...", "messageContent": "...", "useRegisteredUser": true}
+    """
+    if not is_simulation_mode():
+        return jsonify({
+            'error': 'not_allowed',
+            'message': 'This endpoint is only available in simulation mode'
+        }), 403
+
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({'error': 'invalid_request', 'message': 'JSON body required'}), 400
+
+        phone_number = data.get('phoneNumber', '')
+        message_content = data.get('messageContent', '')
+
+        # Validate phone number format
+        if not is_valid_e164(phone_number):
+            return jsonify({
+                'error': 'invalid_phone_number',
+                'message': 'Phone number must be in E.164 format (+1234567890)'
+            }), 400
+
+        db = get_db()
+
+        # Check if user is registered and active
+        user_doc = db.collection('users').document(phone_number).get()
+        is_registered = user_doc.exists and user_doc.to_dict().get('status') == 'active'
+        response_sent = False
+
+        # If registered, simulate sending acknowledgment
+        if is_registered:
+            try:
+                ack_message = send_sms(phone_number, "Your number is recognized. Message received.")
+                response_sent = True
+                logger.info(f"[SIMULATION] Acknowledgment logged for {phone_number}")
+
+                # Log the outgoing acknowledgment
+                ack_record = {
+                    'queuedAt': datetime.now(timezone.utc),
+                    'sentAt': datetime.now(timezone.utc),
+                    'phoneNumber': phone_number,
+                    'messageContent': "Your number is recognized. Message received.",
+                    'operatorId': 'system',
+                    'operatorName': 'System (Auto-reply)',
+                    'status': 'sent',
+                    'twilio_SmsMessageSid': ack_message.sid,
+                    'twilio_ErrorMessage': None,
+                    'simulated': True
+                }
+                db.collection('outgoingMessages').add(ack_record)
+
+            except Exception as e:
+                logger.error(f"[SIMULATION] Failed to log acknowledgment: {e}")
+
+        # Log incoming message to Firestore
+        import uuid
+        incoming_message = {
+            'timestamp': datetime.now(timezone.utc),
+            'phoneNumber': phone_number,
+            'messageContent': message_content,
+            'isRegistered': is_registered,
+            'responseSent': response_sent,
+            'twilio_SmsMessageSid': f"SIM{uuid.uuid4().hex[:30]}",
+            'simulated': True
+        }
+
+        doc_ref = db.collection('incomingMessages').add(incoming_message)
+        message_id = doc_ref[1].id
+
+        logger.info(f"[SIMULATION] Incoming message logged: registered={is_registered}")
+
+        return jsonify({
+            'status': 'success',
+            'messageId': message_id,
+            'phoneNumber': phone_number,
+            'isRegistered': is_registered,
+            'responseSent': response_sent,
+            'simulated': True
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error simulating incoming message: {e}")
+        return jsonify({
+            'error': 'server_error',
+            'message': str(e)
         }), 500

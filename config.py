@@ -10,6 +10,9 @@ class Config:
     # Operator authentication
     OPERATOR_PASSWORD = os.environ.get('OPERATOR_PASSWORD', 'admin')
 
+    # Simulation mode - when True, no Twilio API calls are made
+    SIMULATION_MODE = os.environ.get('SIMULATION_MODE', 'false').lower() == 'true'
+
     # Twilio
     TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID')
     TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN')
