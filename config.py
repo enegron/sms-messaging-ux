@@ -8,6 +8,7 @@ class Config:
     SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
 
     # Operator authentication
+    # TODO: Remove default password - require OPERATOR_PASSWORD env var or disable login
     OPERATOR_PASSWORD = os.environ.get('OPERATOR_PASSWORD', 'admin')
 
     # Simulation mode - when True, no Twilio API calls are made
