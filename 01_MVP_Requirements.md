@@ -179,6 +179,16 @@ A bidirectional SMS messaging system that enables communication with registered 
 - Only authorized operators can send outgoing messages
 - System must distinguish between different operators (for audit trail)
 
+### FR7: Operator Authentication
+- The web console must be secured via authentication
+- The app must NOT use HTTP Basic Authentication
+- The operator password must be stored in a persistent datastore accessible by the app (not hardcoded or environment-only)
+- The app will present a secure login form over HTTPS
+- The app will validate the presented password against the password stored in the secure datastore
+- The console (all pages except login) is only accessible after successful authentication
+- A session cookie must be used to persist a token representing the authenticated login
+- The authenticated session must expire after 4 hours (absolute), requiring re-authentication regardless of activity
+
 ---
 
 ## Non-Functional Requirements
