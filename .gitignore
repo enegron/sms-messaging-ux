@@ -33,3 +33,6 @@ Thumbs.db
 
 # Seed scripts with sensitive data
 seed_users.py
+
+# Password management scripts
+set_operator_password.py

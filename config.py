@@ -7,9 +7,8 @@ class Config:
     """Flask configuration."""
     SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
 
-    # Operator authentication
-    # TODO: Remove default password - require OPERATOR_PASSWORD env var or disable login
-    OPERATOR_PASSWORD = os.environ.get('OPERATOR_PASSWORD', 'admin')
+    # Session expiry (4 hours in seconds) - used by Flask session config
+    PERMANENT_SESSION_LIFETIME = 4 * 60 * 60
 
     # Simulation mode - when True, no Twilio API calls are made
     SIMULATION_MODE = os.environ.get('SIMULATION_MODE', 'false').lower() == 'true'

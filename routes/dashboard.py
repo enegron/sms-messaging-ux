@@ -5,8 +5,9 @@ from datetime import datetime, timezone
 import os
 
 from flask import Blueprint, render_template, request, session, redirect, url_for, jsonify, current_app
+from werkzeug.security import check_password_hash
 
-from services.firebase import get_db
+from services.firebase import get_db, get_operator_password_hash
 from routes.auth import login_required
 
 logger = logging.getLogger(__name__)
@@ -16,17 +17,29 @@ dashboard_bp = Blueprint('dashboard', __name__)
 
 @dashboard_bp.route('/login', methods=['GET', 'POST'])
 def login():
-    """Simple login page for operators."""
+    """Login page for operators.
+
+    Validates password against hashed password stored in Firestore.
+    Creates session with login timestamp for 4-hour expiration.
+    """
     if request.method == 'POST':
         password = request.form.get('password', '')
-        operator_password = current_app.config.get('OPERATOR_PASSWORD', 'admin')
 
-        if password == operator_password:
+        # Get hashed password from Firestore
+        password_hash = get_operator_password_hash()
+
+        if password_hash is None:
+            logger.error("No operator password configured in Firestore")
+            return render_template('login.html', error="System not configured. Please contact administrator.")
+
+        if check_password_hash(password_hash, password):
             session['operator_id'] = 'operator_default'
             session['operator_name'] = 'Operator'
+            session['login_time'] = datetime.now(timezone.utc).isoformat()
             logger.info("Operator logged in")
             return redirect(url_for('dashboard.index'))
         else:
+            logger.warning("Failed login attempt")
             return render_template('login.html', error="Invalid password")
 
     return render_template('login.html', error=None)

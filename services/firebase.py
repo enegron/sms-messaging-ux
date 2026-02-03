@@ -47,3 +47,30 @@ def get_db():
     if _db is None:
         raise RuntimeError("Firebase not initialized. Call init_firebase first.")
     return _db
+
+
+def get_operator_password_hash():
+    """Get the hashed operator password from Firestore.
+
+    Returns:
+        str or None: The hashed password, or None if not set.
+    """
+    db = get_db()
+    doc = db.collection('config').document('operator_auth').get()
+    if doc.exists:
+        data = doc.to_dict()
+        return data.get('password_hash')
+    return None
+
+
+def set_operator_password_hash(password_hash):
+    """Set the hashed operator password in Firestore.
+
+    Args:
+        password_hash: The hashed password to store.
+    """
+    db = get_db()
+    db.collection('config').document('operator_auth').set({
+        'password_hash': password_hash,
+        'updated_at': firestore.SERVER_TIMESTAMP
+    }, merge=True)
