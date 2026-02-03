@@ -20,7 +20,7 @@ def incoming():
     Receive incoming SMS messages from Twilio.
     POST /twilio/incoming
 
-    Logs messages using userId (not phone number) for privacy.
+    Logs messages using UUID userId (not phone number) for privacy.
     Unknown numbers are logged with a hashed identifier.
     """
     try:
@@ -33,9 +33,9 @@ def incoming():
 
         db = get_db()
 
-        # Look up user by phone number
-        user_id, user_data = get_user_by_phone(phone_number)
-        is_registered = user_id is not None and user_data.get('status') == 'active'
+        # Look up user by phone number to get UUID
+        user_uuid, phone, user_data = get_user_by_phone(phone_number)
+        is_registered = user_uuid is not None and user_data.get('status') == 'active'
         response_sent = False
 
         # If registered, send acknowledgment
@@ -43,17 +43,17 @@ def incoming():
             try:
                 send_sms(phone_number, "Your number is recognized. Message received.")
                 response_sent = True
-                logger.info(f"Acknowledgment sent to user {user_id[:8]}...")
+                logger.info(f"Acknowledgment sent to user")
             except Exception as e:
                 logger.error(f"Failed to send acknowledgment: {e}")
 
-        # Determine identifier for logging (userId or hashed phone for unknown)
-        log_identifier = user_id if is_registered else hash_phone_number(phone_number)
+        # Determine identifier for logging (UUID or hashed phone for unknown)
+        log_identifier = user_uuid if is_registered else hash_phone_number(phone_number)
 
         # Log incoming message to Firestore (NO phone number stored)
         incoming_message = {
             'timestamp': datetime.now(timezone.utc),
-            'userId': log_identifier,
+            'userId': log_identifier,  # UUID for registered, hash for unknown
             'messageContent': message_content,
             'isRegistered': is_registered,
             'responseSent': response_sent,

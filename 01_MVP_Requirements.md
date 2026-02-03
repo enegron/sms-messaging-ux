@@ -191,15 +191,20 @@ A bidirectional SMS messaging system that enables communication with registered 
 
 ### FR8: Phone Number Privacy
 - Full phone numbers (PII) must only be stored in one place: the `users` collection
+- The phone number must NEVER be used as the value of any field except the user's `phoneNumber` field in `users`
 - Message logs (`incomingMessages`, `outgoingMessages`) must NOT contain full phone numbers
-- Message logs must reference users by `userId` only
+- Message logs must reference users by `userId` only (userId is the document ID, which happens to be the phone number, but the phone number value itself is not stored in message fields)
 - For incoming messages from unknown/unregistered numbers:
   - Store a SHA256 hash of the phone number (allows correlation without exposing the number)
   - Do not store the actual phone number
   - This is a low-priority use case; minimal resources should be spent on unknown number handling
 - When sending outgoing messages, the system looks up the phone number from `users` internally
 - The dashboard displays user identifiers (name or masked phone) rather than full phone numbers
-- Twilio API calls use the full phone number as required, but it is not persisted in logs
+- For exposing "masked" phone numbers in the UI (which should be minimized and eventually removed):
+  - Phone number must be looked up by userId from `users` collection
+  - Masking must be done server-side before returning to UI or logging
+- System incoming phone number(s) (Twilio numbers) are stored in configuration/environment variables, not in the persistent datastore
+- Twilio API calls use the full phone number as required, but only in memory - never persisted in logs
 
 ---
 

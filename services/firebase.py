@@ -94,39 +94,43 @@ def hash_phone_number(phone_number):
 
 
 def get_user_by_phone(phone_number):
-    """Look up a user by phone number.
+    """Look up a user by phone number (document ID).
 
     Args:
-        phone_number: Phone number in E.164 format.
+        phone_number: Phone number in E.164 format (which is the document ID).
 
     Returns:
-        tuple: (user_id, user_data) if found, (None, None) if not found.
+        tuple: (user_id (UUID), phone_number, user_data) if found, (None, None, None) if not found.
     """
     db = get_db()
     doc = db.collection('users').document(phone_number).get()
     if doc.exists:
-        return doc.id, doc.to_dict()
+        data = doc.to_dict()
+        return data.get('userId'), doc.id, data
+    return None, None, None
+
+
+def get_user_by_uuid(user_uuid):
+    """Look up a user by their UUID userId field.
+
+    Args:
+        user_uuid: The user's UUID (stored in userId field).
+
+    Returns:
+        tuple: (phone_number, user_data) if found, (None, None) if not found.
+    """
+    db = get_db()
+    # Query for user with matching userId
+    query = db.collection('users').where('userId', '==', user_uuid).limit(1)
+    docs = list(query.stream())
+    if docs:
+        doc = docs[0]
+        return doc.id, doc.to_dict()  # doc.id is the phone number
     return None, None
 
 
-def get_user_by_id(user_id):
-    """Look up a user by their ID (which is also their phone number).
-
-    Args:
-        user_id: The user's document ID (phone number in E.164 format).
-
-    Returns:
-        dict or None: User data if found, None if not found.
-    """
-    db = get_db()
-    doc = db.collection('users').document(user_id).get()
-    if doc.exists:
-        return doc.to_dict()
-    return None
-
-
 def mask_phone_number(phone_number):
-    """Mask a phone number to show only last 3 digits.
+    """Mask a phone number to show only last 4 digits.
 
     Args:
         phone_number: Phone number in E.164 format (e.g., +12025551234).
@@ -137,3 +141,32 @@ def mask_phone_number(phone_number):
     if not phone_number or len(phone_number) < 4:
         return "***"
     return f"***-***-{phone_number[-4:]}"
+
+
+def get_user_display_info(user_uuid):
+    """Get display-safe user information by UUID (no full phone number).
+
+    Args:
+        user_uuid: The user's UUID.
+
+    Returns:
+        dict: Display-safe user info with masked phone, or None if not found.
+    """
+    if user_uuid and user_uuid.startswith('unknown_'):
+        # Unknown/hashed number
+        return {
+            'userId': user_uuid,
+            'name': '',
+            'maskedPhone': '(unknown)',
+            'status': 'unknown'
+        }
+
+    phone_number, user_data = get_user_by_uuid(user_uuid)
+    if user_data:
+        return {
+            'userId': user_uuid,
+            'name': user_data.get('name', ''),
+            'maskedPhone': mask_phone_number(phone_number),
+            'status': user_data.get('status', '')
+        }
+    return None

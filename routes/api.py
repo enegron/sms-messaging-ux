@@ -9,8 +9,8 @@ from flask import Blueprint, request, jsonify, session
 from firebase_admin import firestore
 
 from services.firebase import (
-    get_db, get_user_by_phone, get_user_by_id,
-    hash_phone_number, mask_phone_number
+    get_db, get_user_by_phone, get_user_by_uuid,
+    hash_phone_number, mask_phone_number, get_user_display_info
 )
 from services.twilio_sms import send_sms, is_simulation_mode, SimulatedFailure
 from routes.auth import login_required
@@ -26,35 +26,13 @@ def is_valid_e164(phone_number):
     return bool(re.match(pattern, phone_number))
 
 
-def get_user_display_info(user_id, user_data=None):
-    """Get display-safe user information (no full phone number).
-
-    Args:
-        user_id: The user's document ID (phone number).
-        user_data: Optional pre-fetched user data.
-
-    Returns:
-        dict: Display-safe user info with masked phone.
-    """
-    if user_data is None:
-        user_data = get_user_by_id(user_id)
-
-    if user_data:
-        return {
-            'userId': user_id,
-            'name': user_data.get('name', ''),
-            'maskedPhone': mask_phone_number(user_id),
-            'status': user_data.get('status', '')
-        }
-    elif user_id and user_id.startswith('unknown_'):
-        # Unknown/hashed number
-        return {
-            'userId': user_id,
-            'name': '',
-            'maskedPhone': '(unknown)',
-            'status': 'unknown'
-        }
-    return None
+def is_valid_uuid(value):
+    """Check if value looks like a UUID."""
+    try:
+        uuid.UUID(str(value))
+        return True
+    except (ValueError, TypeError):
+        return False
 
 
 @api_bp.route('/config', methods=['GET'])
@@ -75,10 +53,9 @@ def send_message():
     """
     Send an SMS to a registered user.
     POST /api/send-message
-    Body: {"userId": "+1...", "messageContent": "...", "simulateStatus": "sent"}
+    Body: {"userId": "uuid-here", "messageContent": "...", "simulateStatus": "sent"}
 
-    Note: userId is the user's phone number (document ID in users collection).
-    The phone is used internally for Twilio but NOT stored in message logs.
+    Note: userId is the user's UUID. Phone number is looked up internally.
     """
     try:
         data = request.get_json()
@@ -92,11 +69,11 @@ def send_message():
         operator_name = session.get('operator_name', 'Unknown Operator')
         simulate_status = data.get('simulateStatus', 'sent')
 
-        # Validate user_id format (it's an E.164 phone number)
-        if not is_valid_e164(user_id):
+        # Validate userId is a UUID
+        if not is_valid_uuid(user_id):
             return jsonify({
                 'error': 'invalid_user_id',
-                'message': 'User ID must be in E.164 format (+1234567890)'
+                'message': 'User ID must be a valid UUID'
             }), 400
 
         # Validate message content
@@ -109,8 +86,8 @@ def send_message():
         db = get_db()
         simulated = is_simulation_mode()
 
-        # Get user data (phone number is the document ID)
-        user_data = get_user_by_id(user_id)
+        # Look up user by UUID to get phone number
+        phone_number, user_data = get_user_by_uuid(user_id)
 
         if not user_data:
             return jsonify({
@@ -124,15 +101,12 @@ def send_message():
                 'message': 'User status is not active'
             }), 403
 
-        # Get the phone number for Twilio (user_id IS the phone number)
-        phone_number = user_id
-
-        # Create outgoing message record (NO phone number stored)
+        # Create outgoing message record (UUID userId, no phone number)
         queued_at = datetime.now(timezone.utc)
         outgoing_message = {
             'queuedAt': queued_at,
             'sentAt': None,
-            'userId': user_id,
+            'userId': user_id,  # UUID, not phone number
             'messageContent': message_content,
             'operatorId': operator_id,
             'operatorName': operator_name,
@@ -146,7 +120,7 @@ def send_message():
         doc_ref = db.collection('outgoingMessages').add(outgoing_message)
         message_id = doc_ref[1].id
 
-        # Send via Twilio (or simulate)
+        # Send via Twilio (or simulate) - phone_number used in memory only
         try:
             twilio_message = send_sms(phone_number, message_content, simulate_status=simulate_status)
 
@@ -166,7 +140,7 @@ def send_message():
                 'messageId': message_id,
                 'userId': user_id,
                 'userName': user_data.get('name', ''),
-                'maskedPhone': mask_phone_number(user_id),
+                'maskedPhone': mask_phone_number(phone_number),
                 'timestamp': sent_at.isoformat(),
                 'twilio_MessageSid': twilio_message.sid,
                 'simulated': simulated
@@ -203,7 +177,7 @@ def get_incoming_messages():
     GET /api/messages/incoming?limit=100&sort=desc&userId=...&isRegistered=true
     Auto-filters by simulation mode.
 
-    Returns userId and user display info (masked phone), not full phone numbers.
+    Returns userId (UUID) and user display info (masked phone), not full phone numbers.
     """
     try:
         limit = request.args.get('limit', 100, type=int)
@@ -291,7 +265,7 @@ def get_outgoing_messages():
     GET /api/messages/outgoing?limit=100&sort=desc&userId=...&status=sent&operatorId=...
     Auto-filters by simulation mode.
 
-    Returns userId and user display info (masked phone), not full phone numbers.
+    Returns userId (UUID) and user display info (masked phone), not full phone numbers.
     """
     try:
         limit = request.args.get('limit', 100, type=int)
@@ -384,7 +358,7 @@ def get_users():
     Get all registered users.
     GET /api/users?status=active
 
-    Returns userId and masked phone, not full phone numbers.
+    Returns userId (UUID) and masked phone, not full phone numbers.
     """
     try:
         status_filter = request.args.get('status', 'active')
@@ -402,11 +376,12 @@ def get_users():
         users = []
         for doc in docs:
             data = doc.to_dict()
-            user_id = doc.id  # Phone number is the document ID
+            phone_number = doc.id  # Phone number is the document ID
+            user_id = data.get('userId', '')  # UUID
             users.append({
                 'userId': user_id,
                 'name': data.get('name', ''),
-                'maskedPhone': mask_phone_number(user_id),
+                'maskedPhone': mask_phone_number(phone_number),
                 'status': data.get('status', ''),
                 'createdAt': data.get('createdAt').isoformat() if data.get('createdAt') else None
             })
@@ -434,11 +409,11 @@ def simulate_incoming():
     """
     Simulate an incoming SMS message (only works in simulation mode).
     POST /api/simulate/incoming
-    Body: {"userId": "+1...", "messageContent": "..."} for registered user
+    Body: {"userId": "uuid-here", "messageContent": "..."} for registered user
           {"phoneNumber": "+1...", "messageContent": "..."} for unknown number
 
-    Note: For simulation, we accept phoneNumber for unknown numbers to test that flow,
-    but it gets hashed before storage.
+    Note: For simulation of unknown numbers, phoneNumber is used to generate hash.
+    For registered users, userId (UUID) is used.
     """
     if not is_simulation_mode():
         return jsonify({
@@ -452,40 +427,53 @@ def simulate_incoming():
         if not data:
             return jsonify({'error': 'invalid_request', 'message': 'JSON body required'}), 400
 
-        # Accept either userId (for registered) or phoneNumber (for unknown simulation)
         user_id = data.get('userId', '')
-        phone_number = data.get('phoneNumber', user_id)  # Fallback to userId
+        phone_number = data.get('phoneNumber', '')
         message_content = data.get('messageContent', '')
 
-        # Validate phone number format
-        if not is_valid_e164(phone_number):
+        db = get_db()
+        is_registered = False
+        response_sent = False
+        log_identifier = None
+        phone_for_twilio = None
+        user_data = None
+
+        # Check if userId is a UUID (registered user) or if we have a phoneNumber (unknown)
+        if user_id and is_valid_uuid(user_id):
+            # Look up registered user by UUID
+            phone_for_twilio, user_data = get_user_by_uuid(user_id)
+            if user_data and user_data.get('status') == 'active':
+                is_registered = True
+                log_identifier = user_id  # Use UUID
+
+        if not is_registered and phone_number:
+            # Unknown number - validate and hash it
+            if not is_valid_e164(phone_number):
+                return jsonify({
+                    'error': 'invalid_phone_number',
+                    'message': 'Phone number must be in E.164 format (+1234567890)'
+                }), 400
+            log_identifier = hash_phone_number(phone_number)
+            phone_for_twilio = phone_number
+
+        if not log_identifier:
             return jsonify({
-                'error': 'invalid_phone_number',
-                'message': 'Phone number must be in E.164 format (+1234567890)'
+                'error': 'invalid_request',
+                'message': 'Either userId (UUID) or phoneNumber required'
             }), 400
 
-        db = get_db()
-
-        # Check if user is registered and active
-        user_data = get_user_by_id(phone_number)
-        is_registered = user_data is not None and user_data.get('status') == 'active'
-        response_sent = False
-
-        # Determine identifier for logging
-        log_identifier = phone_number if is_registered else hash_phone_number(phone_number)
-
         # If registered, simulate sending acknowledgment
-        if is_registered:
+        if is_registered and phone_for_twilio:
             try:
-                ack_message = send_sms(phone_number, "Your number is recognized. Message received.")
+                ack_message = send_sms(phone_for_twilio, "Your number is recognized. Message received.")
                 response_sent = True
                 logger.info(f"[SIMULATION] Acknowledgment logged for user")
 
-                # Log the outgoing acknowledgment (NO phone number stored)
+                # Log the outgoing acknowledgment (UUID userId, no phone number)
                 ack_record = {
                     'queuedAt': datetime.now(timezone.utc),
                     'sentAt': datetime.now(timezone.utc),
-                    'userId': phone_number,
+                    'userId': user_id,  # UUID
                     'messageContent': "Your number is recognized. Message received.",
                     'operatorId': 'system',
                     'operatorName': 'System (Auto-reply)',
@@ -499,10 +487,10 @@ def simulate_incoming():
             except Exception as e:
                 logger.error(f"[SIMULATION] Failed to log acknowledgment: {e}")
 
-        # Log incoming message to Firestore (NO phone number stored)
+        # Log incoming message to Firestore (UUID or hash, no phone number)
         incoming_message = {
             'timestamp': datetime.now(timezone.utc),
-            'userId': log_identifier,
+            'userId': log_identifier,  # UUID for registered, hash for unknown
             'messageContent': message_content,
             'isRegistered': is_registered,
             'responseSent': response_sent,
@@ -517,7 +505,7 @@ def simulate_incoming():
 
         # Get display info for response
         if is_registered:
-            display_info = get_user_display_info(phone_number, user_data)
+            display_info = get_user_display_info(user_id)
         else:
             display_info = {
                 'userId': log_identifier,
@@ -530,8 +518,8 @@ def simulate_incoming():
             'status': 'success',
             'messageId': message_id,
             'userId': log_identifier,
-            'userName': display_info.get('name', ''),
-            'maskedPhone': display_info.get('maskedPhone', ''),
+            'userName': display_info.get('name', '') if display_info else '',
+            'maskedPhone': display_info.get('maskedPhone', '') if display_info else '(unknown)',
             'isRegistered': is_registered,
             'responseSent': response_sent,
             'simulated': True

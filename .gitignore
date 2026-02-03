@@ -36,3 +36,6 @@ seed_users.py
 
 # Password management scripts
 set_operator_password.py
+
+# database cleanup scripts
+cleanup_old_messages.py
