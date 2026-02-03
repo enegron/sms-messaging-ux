@@ -1,5 +1,6 @@
 """Firebase Firestore service."""
 
+import hashlib
 import logging
 
 import firebase_admin
@@ -74,3 +75,65 @@ def set_operator_password_hash(password_hash):
         'password_hash': password_hash,
         'updated_at': firestore.SERVER_TIMESTAMP
     }, merge=True)
+
+
+def hash_phone_number(phone_number):
+    """Create a SHA256 hash of a phone number for anonymous logging.
+
+    Used for unknown/unregistered numbers to allow correlation without
+    storing the actual phone number (PII).
+
+    Args:
+        phone_number: Phone number in E.164 format.
+
+    Returns:
+        str: SHA256 hash prefixed with 'unknown_' for clarity.
+    """
+    hash_value = hashlib.sha256(phone_number.encode()).hexdigest()[:16]
+    return f"unknown_{hash_value}"
+
+
+def get_user_by_phone(phone_number):
+    """Look up a user by phone number.
+
+    Args:
+        phone_number: Phone number in E.164 format.
+
+    Returns:
+        tuple: (user_id, user_data) if found, (None, None) if not found.
+    """
+    db = get_db()
+    doc = db.collection('users').document(phone_number).get()
+    if doc.exists:
+        return doc.id, doc.to_dict()
+    return None, None
+
+
+def get_user_by_id(user_id):
+    """Look up a user by their ID (which is also their phone number).
+
+    Args:
+        user_id: The user's document ID (phone number in E.164 format).
+
+    Returns:
+        dict or None: User data if found, None if not found.
+    """
+    db = get_db()
+    doc = db.collection('users').document(user_id).get()
+    if doc.exists:
+        return doc.to_dict()
+    return None
+
+
+def mask_phone_number(phone_number):
+    """Mask a phone number to show only last 3 digits.
+
+    Args:
+        phone_number: Phone number in E.164 format (e.g., +12025551234).
+
+    Returns:
+        str: Masked phone number (e.g., ***-***-1234).
+    """
+    if not phone_number or len(phone_number) < 4:
+        return "***"
+    return f"***-***-{phone_number[-4:]}"

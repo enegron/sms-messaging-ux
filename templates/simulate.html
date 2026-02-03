@@ -84,7 +84,7 @@
                 select.innerHTML = '<option value="">No active users found</option>';
             } else {
                 select.innerHTML = data.users.map(u =>
-                    `<option value="${u.phoneNumber}">${u.name || u.phoneNumber} (${u.phoneNumber})</option>`
+                    `<option value="${u.userId}">${u.name || u.maskedPhone} (${u.maskedPhone})</option>`
                 ).join('');
             }
         } catch (e) {
@@ -133,7 +133,8 @@
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
-                    phoneNumber: phoneNumber,
+                    userId: phoneNumber,
+                    phoneNumber: phoneNumber,  // Also send as phoneNumber for unknown number simulation
                     messageContent: message
                 })
             });

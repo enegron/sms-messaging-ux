@@ -19,7 +19,7 @@
     <div class="card">
         <h2>Outgoing Messages</h2>
         <div class="search-box">
-            <input type="text" id="search" placeholder="Search by phone number...">
+            <input type="text" id="search" placeholder="Search by user ID...">
             <select id="filter">
                 <option value="">All</option>
                 <option value="sent">Sent</option>
@@ -32,7 +32,7 @@
             <thead>
                 <tr>
                     <th>Sent At</th>
-                    <th>Phone Number</th>
+                    <th>User</th>
                     <th>Message Content</th>
                     <th>Operator</th>
                     <th>Status</th>
@@ -50,7 +50,7 @@
         const filter = document.getElementById('filter').value;
 
         let url = '/api/messages/outgoing?limit=100';
-        if (search) url += '&phoneNumber=' + encodeURIComponent(search);
+        if (search) url += '&userId=' + encodeURIComponent(search);
         if (filter) url += '&status=' + filter;
 
         try {
@@ -64,7 +64,7 @@
                 tbody.innerHTML = data.messages.map(m => `
                     <tr>
                         <td class="timestamp">${m.sentAt ? new Date(m.sentAt).toLocaleString() : new Date(m.queuedAt).toLocaleString()}</td>
-                        <td class="phone">${m.phoneNumber}</td>
+                        <td class="phone">${m.userName || m.maskedPhone}</td>
                         <td class="message-content" title="${m.messageContent}">${m.messageContent}</td>
                         <td>${m.operatorName || m.operatorId}</td>
                         <td><span class="badge ${m.status === 'sent' ? 'badge-success' : m.status === 'failed' ? 'badge-error' : 'badge-warning'}">${m.status}</span></td>

@@ -60,7 +60,7 @@
                 select.innerHTML = '<option value="">No active users found</option>';
             } else {
                 select.innerHTML = '<option value="">Select a user...</option>' +
-                    data.users.map(u => `<option value="${u.phoneNumber}">${u.name || u.phoneNumber} (${u.phoneNumber})</option>`).join('');
+                    data.users.map(u => `<option value="${u.userId}">${u.name || u.maskedPhone} (${u.maskedPhone})</option>`).join('');
             }
         } catch (e) {
             console.error('Failed to load users:', e);
@@ -89,7 +89,7 @@
 
         try {
             const body = {
-                phoneNumber: phone,
+                userId: phone,
                 messageContent: message
             };
 

@@ -29,7 +29,7 @@
         <table>
             <thead>
                 <tr>
-                    <th>Phone Number</th>
+                    <th>Phone (Masked)</th>
                     <th>Name</th>
                     <th>Status</th>
                     <th>Created At</th>
@@ -55,7 +55,7 @@
             } else {
                 tbody.innerHTML = data.users.map(u => `
                     <tr>
-                        <td class="phone">${u.phoneNumber}</td>
+                        <td class="phone">${u.maskedPhone}</td>
                         <td>${u.name || '-'}</td>
                         <td><span class="badge ${u.status === 'active' ? 'badge-success' : 'badge-warning'}">${u.status}</span></td>
                         <td class="timestamp">${u.createdAt ? new Date(u.createdAt).toLocaleString() : '-'}</td>

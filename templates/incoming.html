@@ -19,7 +19,7 @@
     <div class="card">
         <h2>Incoming Messages</h2>
         <div class="search-box">
-            <input type="text" id="search" placeholder="Search by phone number...">
+            <input type="text" id="search" placeholder="Search by user ID...">
             <select id="filter">
                 <option value="">All</option>
                 <option value="true">Registered Only</option>
@@ -31,7 +31,7 @@
             <thead>
                 <tr>
                     <th>Timestamp</th>
-                    <th>Phone Number</th>
+                    <th>User</th>
                     <th>Message Content</th>
                     <th>Status</th>
                     <th>Response Sent</th>
@@ -49,7 +49,7 @@
         const filter = document.getElementById('filter').value;
 
         let url = '/api/messages/incoming?limit=100';
-        if (search) url += '&phoneNumber=' + encodeURIComponent(search);
+        if (search) url += '&userId=' + encodeURIComponent(search);
         if (filter) url += '&isRegistered=' + filter;
 
         try {
@@ -63,7 +63,7 @@
                 tbody.innerHTML = data.messages.map(m => `
                     <tr>
                         <td class="timestamp">${new Date(m.timestamp).toLocaleString()}</td>
-                        <td class="phone">${m.phoneNumber}</td>
+                        <td class="phone">${m.userName || m.maskedPhone}</td>
                         <td class="message-content" title="${m.messageContent}">${m.messageContent || '(empty)'}</td>
                         <td>${m.isRegistered
                             ? '<span class="badge badge-success">Registered</span>'

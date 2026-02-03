@@ -189,6 +189,18 @@ A bidirectional SMS messaging system that enables communication with registered 
 - A session cookie must be used to persist a token representing the authenticated login
 - The authenticated session must expire after 4 hours (absolute), requiring re-authentication regardless of activity
 
+### FR8: Phone Number Privacy
+- Full phone numbers (PII) must only be stored in one place: the `users` collection
+- Message logs (`incomingMessages`, `outgoingMessages`) must NOT contain full phone numbers
+- Message logs must reference users by `userId` only
+- For incoming messages from unknown/unregistered numbers:
+  - Store a SHA256 hash of the phone number (allows correlation without exposing the number)
+  - Do not store the actual phone number
+  - This is a low-priority use case; minimal resources should be spent on unknown number handling
+- When sending outgoing messages, the system looks up the phone number from `users` internally
+- The dashboard displays user identifiers (name or masked phone) rather than full phone numbers
+- Twilio API calls use the full phone number as required, but it is not persisted in logs
+
 ---
 
 ## Non-Functional Requirements

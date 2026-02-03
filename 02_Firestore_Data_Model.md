@@ -82,32 +82,52 @@ Logs all incoming SMS messages (from users and unknown numbers).
 incomingMessages/{autoId}
 ├── timestamp: timestamp (required)
 │   └── When message was received by Twilio
-├── phoneNumber: string (required)
-│   └── E.164 format of sending number
+├── userId: string (required)
+│   └── For registered users: phone number (E.164 format, matches users collection doc ID)
+│   └── For unknown numbers: SHA256 hash prefixed with "unknown_" (e.g., "unknown_a1b2c3d4...")
+│   └── NOTE: Full phone numbers are NOT stored for privacy (see FR8)
 ├── messageContent: string (required)
 │   └── Full text of SMS (can be empty string)
 ├── isRegistered: boolean (required)
-│   └── true = number is in users collection
-│   └── false = number not found in users collection
+│   └── true = userId is a registered user
+│   └── false = userId is a hashed unknown number
 ├── responseSent: boolean (required)
 │   └── true = acknowledgment was sent to sender
 │   └── false = no response was sent
 ├── twilio_SmsMessageSid: string (required)
 │   └── Twilio's message ID for tracking/debugging
+├── simulated: boolean (required)
+│   └── true = message was simulated (not from real Twilio)
 └── notes: string (optional)
     └── Operator notes about this message
 ```
 
-**Example document:**
+**Example document (registered user):**
 
 ```json
 {
   "timestamp": "2025-01-15T14:23:45.123Z",
-  "phoneNumber": "+12025551234",
+  "userId": "+12025551234",
   "messageContent": "Hello, testing the system",
   "isRegistered": true,
   "responseSent": true,
   "twilio_SmsMessageSid": "SMxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "simulated": false,
+  "notes": ""
+}
+```
+
+**Example document (unknown number):**
+
+```json
+{
+  "timestamp": "2025-01-15T14:25:00.000Z",
+  "userId": "unknown_a1b2c3d4e5f6g7h8",
+  "messageContent": "Who is this?",
+  "isRegistered": false,
+  "responseSent": false,
+  "twilio_SmsMessageSid": "SMxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "simulated": false,
   "notes": ""
 }
 ```
@@ -147,8 +167,10 @@ outgoingMessages/{autoId}
 │   └── When operator initiated send
 ├── sentAt: timestamp (required)
 │   └── When Twilio confirmed message was sent (or null if pending)
-├── phoneNumber: string (required)
-│   └── E.164 format of recipient
+├── userId: string (required)
+│   └── User's document ID from users collection (phone number in E.164 format)
+│   └── NOTE: Full phone numbers are NOT stored directly for privacy (see FR8)
+│   └── The phone is looked up from users collection when sending
 ├── messageContent: string (required)
 │   └── Full text of SMS sent
 ├── operatorId: string (required)
@@ -162,6 +184,8 @@ outgoingMessages/{autoId}
 │   └── Twilio's message ID once sent (null if not yet sent)
 ├── twilio_ErrorMessage: string (optional)
 │   └── Error description if status = "failed"
+├── simulated: boolean (required)
+│   └── true = message was simulated (not sent via real Twilio)
 └── notes: string (optional)
     └── Operator notes about why message was sent
 ```
@@ -172,13 +196,14 @@ outgoingMessages/{autoId}
 {
   "queuedAt": "2025-01-15T14:25:10.456Z",
   "sentAt": "2025-01-15T14:25:12.789Z",
-  "phoneNumber": "+12025551234",
+  "userId": "+12025551234",
   "messageContent": "Your order has been shipped!",
   "operatorId": "operator_alice",
   "operatorName": "Alice Johnson",
   "status": "sent",
   "twilio_SmsMessageSid": "SMxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
   "twilio_ErrorMessage": null,
+  "simulated": false,
   "notes": "Sent shipping notification"
 }
 ```

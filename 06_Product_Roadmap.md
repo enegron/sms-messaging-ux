@@ -515,23 +515,13 @@ By Month 4-5, we'll have an **AI-agent-driven SMS platform** capable of sophisti
 
 ## Backlog
 
-### Phone Number Masking in UI
+### ~~Phone Number Masking in UI~~ ✅ COMPLETED
 
-**Priority:** Medium
-**Phase:** MVP Enhancement
+**Status:** Implemented in FR8 (Phone Number Privacy)
 
-Mask phone numbers in the UI to only show the last 3 digits (e.g., `***-***-6377`).
-
-**Requirements:**
-- Implement at the lowest level possible to avoid duplicating logic across UIs
-- The frontend should never receive the full unmasked number
-- Ideally one place in the codebase applies this masking logic
-- Database always stores the full E.164 number (unchanged)
-- Third-party integrations (Twilio, etc.) continue to receive full numbers
-- Masking is applied only when preparing data for UI/dashboard display
-
-**Implementation notes:**
-- Create a utility function (e.g., `mask_phone_number()`) in a shared service
-- Apply masking in API response serialization, not in templates
-- Consider: should operators ever see full numbers? (future admin permission)
+Phone numbers are now masked in the UI (e.g., `***-***-6377`). Implementation:
+- `mask_phone_number()` utility in `services/firebase.py`
+- Applied at API response serialization level
+- Message logs store `userId` instead of phone numbers
+- Unknown numbers stored as SHA256 hash (`unknown_xxxx`)
 

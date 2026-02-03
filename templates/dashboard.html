@@ -50,7 +50,7 @@
                 <tr>
                     <th>Time</th>
                     <th>Type</th>
-                    <th>Phone Number</th>
+                    <th>User</th>
                     <th>Message</th>
                     <th>Status</th>
                 </tr>
@@ -90,7 +90,7 @@
                     <tr>
                         <td class="timestamp">${new Date(m.timestamp).toLocaleString()}</td>
                         <td><span class="badge ${m.type === 'incoming' ? 'badge-info' : 'badge-success'}">${m.type}</span></td>
-                        <td class="phone">${m.phoneNumber}</td>
+                        <td class="phone">${m.userName || m.maskedPhone}</td>
                         <td class="message-content">${m.messageContent || '(empty)'}</td>
                         <td>${m.type === 'incoming'
                             ? (m.isRegistered ? '<span class="badge badge-success">Registered</span>' : '<span class="badge badge-warning">Unknown</span>')
