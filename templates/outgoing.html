@@ -33,23 +33,38 @@
     </div>
 </div>
 <script>
+    // NOTE: Client-side filtering used because Firestore requires composite indexes
+    // for queries with multiple where clauses + orderBy. TODO: Create Firestore indexes.
     async function loadMessages() {
-        const search = document.getElementById('search').value;
+        const search = document.getElementById('search').value.toLowerCase();
         const filter = document.getElementById('filter').value;
 
-        let url = '/api/messages/outgoing?limit=100';
-        if (search) url += '&userId=' + encodeURIComponent(search);
-        if (filter) url += '&status=' + filter;
+        let url = '/api/messages/outgoing?limit=500';
 
         try {
             const res = await fetch(url);
             const data = await res.json();
 
+            // Client-side filtering
+            let messages = data.messages || [];
+
+            if (search) {
+                messages = messages.filter(m =>
+                    (m.userId && m.userId.toLowerCase().includes(search)) ||
+                    (m.userName && m.userName.toLowerCase().includes(search)) ||
+                    (m.maskedPhone && m.maskedPhone.includes(search))
+                );
+            }
+
+            if (filter) {
+                messages = messages.filter(m => m.status === filter);
+            }
+
             const tbody = document.getElementById('messages-body');
-            if (data.messages.length === 0) {
+            if (messages.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No messages found</td></tr>';
             } else {
-                tbody.innerHTML = data.messages.map(m => `
+                tbody.innerHTML = messages.map(m => `
                     <tr>
                         <td class="timestamp">${m.sentAt ? new Date(m.sentAt).toLocaleString() : new Date(m.queuedAt).toLocaleString()}</td>
                         <td class="phone">${m.userName || m.maskedPhone}</td>

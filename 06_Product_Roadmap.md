@@ -515,6 +515,27 @@ By Month 4-5, we'll have an **AI-agent-driven SMS platform** capable of sophisti
 
 ## Backlog
 
+### Create Firestore Composite Indexes
+
+**Status:** Future consideration
+
+Currently, message filtering uses client-side filtering because Firestore requires composite indexes for queries with multiple `where` clauses combined with `orderBy`. Without indexes, these queries fail silently.
+
+Indexes needed:
+- `outgoingMessages`: `simulated` + `status` + `queuedAt`
+- `outgoingMessages`: `simulated` + `userId` + `queuedAt`
+- `incomingMessages`: `simulated` + `isRegistered` + `timestamp`
+- `incomingMessages`: `simulated` + `userId` + `timestamp`
+
+To create indexes:
+1. Go to Firebase Console → Firestore → Indexes
+2. Create composite indexes for the combinations above
+3. Update API to use server-side filtering (remove client-side filtering in templates)
+
+For now, client-side filtering works fine for small datasets.
+
+---
+
 ### Consider Migrating to Render
 
 **Status:** Future consideration
