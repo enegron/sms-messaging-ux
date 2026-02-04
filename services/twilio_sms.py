@@ -6,6 +6,8 @@ import uuid
 
 from twilio.rest import Client as TwilioClient
 
+from services.firebase import mask_phone_number
+
 logger = logging.getLogger(__name__)
 
 # Global client instance
@@ -70,7 +72,7 @@ def send_sms(to_number, message_body, simulate_status='sent'):
         SimulatedFailure if simulate_status is 'failed' (in simulation mode)
     """
     if is_simulation_mode():
-        logger.info(f"[SIMULATION] SMS to {to_number}: {message_body[:50]}...")
+        logger.info(f"[SIMULATION] SMS to {mask_phone_number(to_number)}: {message_body[:50]}...")
 
         if simulate_status == 'failed':
             raise SimulatedFailure("Simulated send failure")
@@ -89,7 +91,7 @@ def send_sms(to_number, message_body, simulate_status='sent'):
         to=to_number
     )
 
-    logger.info(f"SMS sent to {to_number}, SID: {message.sid}")
+    logger.info(f"SMS sent to {mask_phone_number(to_number)}, SID: {message.sid}")
     return message
 
 
