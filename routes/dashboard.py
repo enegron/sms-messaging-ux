@@ -79,39 +79,39 @@ def health():
 @login_required
 def index():
     """Main operator dashboard."""
-    return render_template('dashboard.html')
+    return render_template('dashboard.html', active_page='dashboard')
 
 
 @dashboard_bp.route('/incoming')
 @login_required
 def incoming_messages():
     """Incoming messages view."""
-    return render_template('incoming.html')
+    return render_template('incoming.html', active_page='incoming')
 
 
 @dashboard_bp.route('/outgoing')
 @login_required
 def outgoing_messages():
     """Outgoing messages view."""
-    return render_template('outgoing.html')
+    return render_template('outgoing.html', active_page='outgoing')
 
 
 @dashboard_bp.route('/send')
 @login_required
 def send_message():
     """Send message form."""
-    return render_template('send.html')
+    return render_template('send.html', active_page='send')
 
 
 @dashboard_bp.route('/users')
 @login_required
 def users():
     """Users list view."""
-    return render_template('users.html')
+    return render_template('users.html', active_page='users')
 
 
 @dashboard_bp.route('/simulate')
 @login_required
 def simulate():
     """Simulate incoming SMS page (simulation mode only)."""
-    return render_template('simulate.html')
+    return render_template('simulate.html', active_page='simulate')

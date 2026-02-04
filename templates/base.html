@@ -1,6 +1,3 @@
-{# TODO: Move the header div (with nav) from child templates into this base template.
-   Currently each page duplicates the header. Use a block variable or template var
-   to mark the active nav item per page. #}
 <!DOCTYPE html>
 <html>
 <head>
@@ -91,6 +88,20 @@
     </script>
 </head>
 <body>
+    {% block header %}
+    <div class="header">
+        <h1>SMS Messaging Dashboard</h1>
+        <div class="nav">
+            <a href="/" {% if active_page == 'dashboard' %}class="active"{% endif %}>Dashboard</a>
+            <a href="/incoming" {% if active_page == 'incoming' %}class="active"{% endif %}>Incoming Messages</a>
+            <a href="/outgoing" {% if active_page == 'outgoing' %}class="active"{% endif %}>Outgoing Messages</a>
+            <a href="/send" {% if active_page == 'send' %}class="active"{% endif %}>Send Message</a>
+            <a href="/users" {% if active_page == 'users' %}class="active"{% endif %}>Users</a>
+            <a href="/simulate" class="simulation-only{% if active_page == 'simulate' %} active{% endif %}" style="display:none;">Simulate Incoming</a>
+        </div>
+        <a href="/logout" class="logout btn btn-secondary">Logout</a>
+    </div>
+    {% endblock %}
     {% block body %}{% endblock %}
 </body>
 </html>
