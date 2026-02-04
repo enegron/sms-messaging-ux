@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, request, jsonify, session
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from services.firebase import (
     get_db, get_user_by_phone, get_user_by_uuid,
@@ -191,15 +192,15 @@ def get_incoming_messages():
         query = db.collection('incomingMessages')
 
         # Auto-filter by simulation mode
-        query = query.where('simulated', '==', simulated)
+        query = query.where(filter=FieldFilter('simulated', '==', simulated))
 
         # Apply filters
         if user_filter:
-            query = query.where('userId', '==', user_filter)
+            query = query.where(filter=FieldFilter('userId', '==', user_filter))
 
         if registered_filter:
             is_reg = registered_filter.lower() == 'true'
-            query = query.where('isRegistered', '==', is_reg)
+            query = query.where(filter=FieldFilter('isRegistered', '==', is_reg))
 
         # Apply sorting
         direction = firestore.Query.DESCENDING if sort_order == 'desc' else firestore.Query.ASCENDING
@@ -280,17 +281,17 @@ def get_outgoing_messages():
         query = db.collection('outgoingMessages')
 
         # Auto-filter by simulation mode
-        query = query.where('simulated', '==', simulated)
+        query = query.where(filter=FieldFilter('simulated', '==', simulated))
 
         # Apply filters
         if user_filter:
-            query = query.where('userId', '==', user_filter)
+            query = query.where(filter=FieldFilter('userId', '==', user_filter))
 
         if status_filter:
-            query = query.where('status', '==', status_filter)
+            query = query.where(filter=FieldFilter('status', '==', status_filter))
 
         if operator_filter:
-            query = query.where('operatorId', '==', operator_filter)
+            query = query.where(filter=FieldFilter('operatorId', '==', operator_filter))
 
         # Apply sorting (use queuedAt since sentAt may be null)
         direction = firestore.Query.DESCENDING if sort_order == 'desc' else firestore.Query.ASCENDING
@@ -368,7 +369,7 @@ def get_users():
 
         # Apply status filter (unless 'all')
         if status_filter != 'all':
-            query = query.where('status', '==', status_filter)
+            query = query.where(filter=FieldFilter('status', '==', status_filter))
 
         # Execute query
         docs = query.stream()

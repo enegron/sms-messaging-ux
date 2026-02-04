@@ -6,6 +6,7 @@ import logging
 import firebase_admin
 from firebase_admin import credentials, firestore
 from flask import current_app
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,7 @@ def get_user_by_uuid(user_uuid):
     """
     db = get_db()
     # Query for user with matching userId
-    query = db.collection('users').where('userId', '==', user_uuid).limit(1)
+    query = db.collection('users').where(filter=FieldFilter('userId', '==', user_uuid)).limit(1)
     docs = list(query.stream())
     if docs:
         doc = docs[0]
