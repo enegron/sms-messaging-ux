@@ -39,3 +39,5 @@ set_operator_password.py
 
 # database cleanup scripts
 cleanup_old_messages.py
+migrate_users_add_userid.py
+batch_simulate.py
