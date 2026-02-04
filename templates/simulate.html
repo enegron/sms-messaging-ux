@@ -4,9 +4,9 @@
 
 {% block body %}
 <div class="container">
-    <div class="card" style="max-width: 600px;">
+    <div class="card card-narrow">
         <h2>Simulate Incoming SMS</h2>
-        <p style="color: #6b7280; margin-bottom: 20px;">
+        <p class="description">
             Simulate receiving an SMS from a phone number. This tests the incoming message flow,
             including user recognition and automatic acknowledgment responses.
         </p>
@@ -25,10 +25,10 @@
                     <option value="">Loading users...</option>
                 </select>
             </div>
-            <div class="form-group" id="unknown-phone-group" style="display:none;">
+            <div class="form-group hidden" id="unknown-phone-group">
                 <label for="unknown-phone">Enter Phone Number</label>
                 <input type="text" id="unknown-phone" name="unknown-phone" value="+12125551234" placeholder="+1234567890">
-                <div style="font-size: 12px; color: #6b7280; margin-top: 5px;">
+                <div class="form-hint">
                     Must be in E.164 format (e.g., +12125551234)
                 </div>
             </div>
@@ -40,7 +40,7 @@
         </form>
     </div>
 
-    <div class="card" style="max-width: 600px;">
+    <div class="card card-narrow">
         <h2>What Happens</h2>
         <table>
             <tr>
@@ -88,11 +88,11 @@
         const unknownGroup = document.getElementById('unknown-phone-group');
 
         if (senderType === 'registered') {
-            registeredGroup.style.display = 'block';
-            unknownGroup.style.display = 'none';
+            registeredGroup.classList.remove('hidden');
+            unknownGroup.classList.add('hidden');
         } else {
-            registeredGroup.style.display = 'none';
-            unknownGroup.style.display = 'block';
+            registeredGroup.classList.add('hidden');
+            unknownGroup.classList.remove('hidden');
         }
     }
 
