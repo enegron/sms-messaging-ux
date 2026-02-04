@@ -515,6 +515,20 @@ By Month 4-5, we'll have an **AI-agent-driven SMS platform** capable of sophisti
 
 ## Backlog
 
+### Consider Migrating to Render
+
+**Status:** Future consideration
+
+Deployment is currently on Railway Free tier which has limitations:
+- Serverless deployments (app sleeps after inactivity, cold start delay on first request)
+- 1 vCPU / 0.5 GB RAM per service
+- Random region assignment (no region selection)
+- Potential timeout issues with Twilio webhooks if app is sleeping during incoming SMS
+
+Consider migrating to Render for reduced friction and more predictable free tier behavior.
+
+---
+
 ### ~~Phone Number Masking in UI~~ ✅ COMPLETED
 
 **Status:** Implemented in FR8 (Phone Number Privacy)
