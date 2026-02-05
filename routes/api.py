@@ -66,6 +66,9 @@ def send_message():
 
         user_id = data.get('userId', '')
         message_content = data.get('messageContent', '')
+        # TODO: Disallow "unknown" operator actions - reject requests if operator_id
+        # is not in session rather than falling back to 'unknown'. This ensures all
+        # messages have proper operator attribution for audit purposes.
         operator_id = data.get('operatorId', session.get('operator_id', 'unknown'))
         operator_name = session.get('operator_name', 'Unknown Operator')
         simulate_status = data.get('simulateStatus', 'sent')
