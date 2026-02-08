@@ -313,8 +313,9 @@ Operator Browser         Railway Backend         Firebase
 
 - User phone numbers are PII
 - Firebase encrypts at rest
-- Backend must never log phone numbers to stdout
-- Operator dashboard requires authentication
+- Backend must never log unmasked phone numbers to stdout or other outputs
+- Unmasked numbers can only be used when critical to make a API calls to act on the number, and then must over secure endpoints
+- Operator dashboard requires authentication, but should never reveal unmaked numbers
 
 ### Audit Trail
 
